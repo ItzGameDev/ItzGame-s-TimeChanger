@@ -21,6 +21,11 @@
   -->
 
   <ItemGroup>
+    <EmbeddedResource Include="..\bark.ogg" LogicalName="TimeChangerMod.bark.ogg" />
+    <EmbeddedResource Include="..\destiny.ogg" LogicalName="TimeChangerMod.destiny.ogg" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Reference Include="BepInEx">
       <HintPath>..\BepInEx.dll</HintPath>
       <Private>false</Private>
@@ -81,16 +86,16 @@
       <HintPath>..\PhotonUnityNetworking.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <Reference Include="UnityEngine.PhysicsModule">
+      <HintPath>..\UnityEngine.PhysicsModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
     <Reference Include="UnityEngine.TextRenderingModule">
       <HintPath>..\UnityEngine.TextRenderingModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="Valve.Newtonsoft.Json">
       <HintPath>..\Valve.Newtonsoft.Json.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="Photon3Unity3D">
-      <HintPath>..\Photon3Unity3D.dll</HintPath>
       <Private>false</Private>
     </Reference>
   </ItemGroup>

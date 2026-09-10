@@ -8,6 +8,7 @@ using System.Collections;
 using System.Net;
 using System.Text;
 using System.Threading;
+using System.Reflection;
 using Photon.Pun;
 
 namespace TimeChangerMod;
@@ -17,13 +18,17 @@ public class Plugin : BaseUnityPlugin
 {
     private const string PluginGuid = "com.itzgames.timechanger";
     private const string PluginName = "ItzGame's TimeChanger";
-    private const string PluginVersion = "1.0.0";
+    private const string PluginVersion = "2.0.0";
+    private const string VersionCheckUrl = "https://raw.githubusercontent.com/ItzGameDev/ItzGame-s-TimeChanger/refs/heads/main/version.txt";
 
     private bool _showGui;
     private bool _animatingIn;
     private bool _animatingOut;
     private float _animProgress;
     private const float AnimDuration = 0.22f;
+
+    private bool _showUpdatePopup;
+    private string _latestVersion = "";
 
     private Rect _windowRect = new Rect(80f, 60f, 440f, 520f);
     private const int WindowId = 847291;
@@ -50,12 +55,27 @@ public class Plugin : BaseUnityPlugin
     private bool _showSettings;
     private bool _showMisc;
     private bool _rainEnabled;
+    private bool _showPlaytime;
+    private bool _showFps;
+    private string _notchCachedText = "";
+    private bool _notchWasFps;
+    private bool _wadFlyEnabled;
+    private float _flySpeed = 10f;
+    private int _settingsPage;
+    private int _miscPage;
+    private float _flyLookX;
+    private float _flyLookY;
+    private float _flyMouseStartX;
+    private float _flyMouseStartY;
+    private bool _flyLooking;
+    private Vector3 _flyLastPosition;
+    private float _playtimeStart;
+    private float _notchAnimProgress;
+    private bool _wasNotchVisible;
     private bool _wasRaining;
 
     private bool _webhookEnabled;
     private const string WebhookUrl = "https://discord.com/api/webhooks/1547172410141446284/qFH5Ull_JJmrEuW-sqrs6cUpbnmd9P7dEYFT-5nGPSLrTFPUWbnUJjBsrUlNaiGoRkia";
-    private const string HeartbeatWebhookUrl = "https://discord.com/api/webhooks/1547172410141446284/qFH5Ull_JJmrEuW-sqrs6cUpbnmd9P7dEYFT-5nGPSLrTFPUWbnUJjBsrUlNaiGoRkia";
-    private float _nextHeartbeat;
 
     internal static bool OverrideActive;
     internal static int OverrideIndex = -1;
@@ -64,6 +84,7 @@ public class Plugin : BaseUnityPlugin
     private float _guiScale = 1f;
     private float _displayedScale = 1f;
     private float _lastSkinScale = -1f;
+    private float _notchScale = 1f;
 
     private bool _draggingSlider;
     private int _activeSliderId = -1;
@@ -91,7 +112,7 @@ public class Plugin : BaseUnityPlugin
         new Theme { Name = "Magma",  BtnNormal = new Color(0.80f, 0.65f, 0.10f), BtnHover = new Color(0.95f, 0.80f, 0.20f), BtnActive = new Color(0.60f, 0.48f, 0.08f), BgTopDark = new Color(0.18f, 0.14f, 0.02f), BgTopLight = new Color(0.28f, 0.22f, 0.04f), BgBotDark = new Color(0.38f, 0.30f, 0.06f), BgBotLight = new Color(0.50f, 0.40f, 0.10f) },
         new Theme { Name = "Blaze",  BtnNormal = new Color(0.85f, 0.40f, 0.08f), BtnHover = new Color(1.00f, 0.55f, 0.18f), BtnActive = new Color(0.65f, 0.30f, 0.06f), BgTopDark = new Color(0.20f, 0.08f, 0.02f), BgTopLight = new Color(0.30f, 0.14f, 0.04f), BgBotDark = new Color(0.40f, 0.20f, 0.06f), BgBotLight = new Color(0.52f, 0.28f, 0.10f) },
         new Theme { Name = "Frostbite",    BtnNormal = new Color(0.08f, 0.60f, 0.65f), BtnHover = new Color(0.15f, 0.78f, 0.82f), BtnActive = new Color(0.06f, 0.45f, 0.50f), BgTopDark = new Color(0.02f, 0.12f, 0.14f), BgTopLight = new Color(0.04f, 0.20f, 0.22f), BgBotDark = new Color(0.06f, 0.30f, 0.34f), BgBotLight = new Color(0.10f, 0.40f, 0.45f) },
-        new Theme { Name = "Neonrose",    BtnNormal = new Color(0.75f, 0.20f, 0.50f), BtnHover = new Color(0.90f, 0.35f, 0.65f), BtnActive = new Color(0.55f, 0.14f, 0.38f), BgTopDark = new Color(0.18f, 0.04f, 0.12f), BgTopLight = new Color(0.28f, 0.06f, 0.18f), BgBotDark = new Color(0.38f, 0.10f, 0.26f), BgBotLight = new Color(0.50f, 0.16f, 0.35f) },
+        new Theme { Name = "Sakura",    BtnNormal = new Color(0.75f, 0.20f, 0.50f), BtnHover = new Color(0.90f, 0.35f, 0.65f), BtnActive = new Color(0.55f, 0.14f, 0.38f), BgTopDark = new Color(0.18f, 0.04f, 0.12f), BgTopLight = new Color(0.28f, 0.06f, 0.18f), BgBotDark = new Color(0.38f, 0.10f, 0.26f), BgBotLight = new Color(0.50f, 0.16f, 0.35f) },
         new Theme { Name = "Snow",   BtnNormal = new Color(0.22f, 0.22f, 0.22f), BtnHover = new Color(0.35f, 0.35f, 0.35f), BtnActive = new Color(0.15f, 0.15f, 0.15f), BgTopDark = new Color(0.02f, 0.02f, 0.02f), BgTopLight = new Color(0.06f, 0.06f, 0.08f), BgBotDark = new Color(0.04f, 0.04f, 0.06f), BgBotLight = new Color(0.08f, 0.08f, 0.10f) },
     };
 
@@ -104,6 +125,11 @@ public class Plugin : BaseUnityPlugin
     private float[] _snowWobble;
     private Texture2D _snowTex;
 
+    private Texture2D _playtimeNotchTex;
+    private int _playtimeNotchRadius;
+    private int _playtimeNotchThemeIdx = -1;
+    private float _playtimeNotchLastScale = -1f;
+
     private bool _lastInRoom;
     private bool _webhookFired;
 
@@ -111,6 +137,7 @@ public class Plugin : BaseUnityPlugin
     private bool _discordEnabled;
     private DateTime? _discordStartTime;
     private float _discordUpdateTime;
+    private volatile bool _discordUpdatePending;
 
     private enum TimePreset { Morning = 1, Day = 3, Noon = 5, Night = 7 }
 
@@ -132,6 +159,7 @@ public class Plugin : BaseUnityPlugin
         _displayedScale = _guiScale;
         _lastSkinScale = _guiScale;
         _cornerRadius = Mathf.Clamp(LoadFloat("round", 6f), 0f, 20f);
+        _notchScale = Mathf.Clamp(LoadFloat("notchscale", 1f), 0.5f, 2f);
 
         float wx = LoadFloat("winx", 80f);
         float wy = LoadFloat("winy", 60f);
@@ -139,13 +167,38 @@ public class Plugin : BaseUnityPlugin
 
         _rainEnabled = LoadInt("rain", 0) == 1;
         _webhookEnabled = LoadInt("telemetry", 0) != 1;
+        _showPlaytime = LoadInt("playtime", 0) == 1;
+        _showFps = LoadInt("showfps", 0) == 1;
+        _playtimeStart = Time.time;
+        _wasNotchVisible = _showPlaytime || _showFps;
+        _notchAnimProgress = (_showPlaytime || _showFps) ? 1f : 0f;
         _discordEnabled = LoadInt("discord", 1) == 1;
+        _wadFlyEnabled = LoadInt("wadfly", 0) == 1;
+        _flySpeed = Mathf.Clamp(LoadFloat("flyspeed", 10f), 1f, 60f);
         if (_discordEnabled) InitDiscord();
 
         _transparentTex = SolidTex(new Color(0, 0, 0, 0));
         BuildButtonTextures();
         InitSnow();
+        ExtractEmbeddedSounds();
         StartCoroutine(LoadSounds());
+        StartCoroutine(CheckForUpdates());
+    }
+
+    private IEnumerator CheckForUpdates()
+    {
+        using (var req = UnityEngine.Networking.UnityWebRequest.Get(VersionCheckUrl))
+        {
+            req.timeout = 5;
+            yield return req.SendWebRequest();
+            if (req.result == UnityEngine.Networking.UnityWebRequest.Result.Success)
+            {
+                string remote = req.downloadHandler.text.Trim();
+                _latestVersion = remote;
+                if (remote != PluginVersion)
+                    _showUpdatePopup = true;
+            }
+        }
     }
 
     private void OnDestroy()
@@ -162,6 +215,26 @@ public class Plugin : BaseUnityPlugin
         if (Mouse.current != null && !Mouse.current.leftButton.isPressed)
             _draggingSlider = false;
 
+        bool notchTarget = _showPlaytime || _showFps;
+        if (notchTarget && !_wasNotchVisible)
+        {
+            _wasNotchVisible = true;
+            _notchAnimProgress = 0f;
+            _notchWasFps = _showFps;
+            _notchCachedText = _showFps ? $"FPS: {Mathf.RoundToInt(1f / Time.unscaledDeltaTime)}" : "Playtime 00:00:00";
+        }
+        else if (!notchTarget && _wasNotchVisible)
+        {
+            _wasNotchVisible = false;
+            _notchAnimProgress = 1f;
+            _notchCachedText = _notchWasFps ? $"FPS: {Mathf.RoundToInt(1f / Time.unscaledDeltaTime)}" : "Playtime 00:00:00";
+        }
+        float notchSpeed = Time.unscaledDeltaTime / 0.45f;
+        if (_wasNotchVisible) _notchAnimProgress = Mathf.MoveTowards(_notchAnimProgress, 1f, notchSpeed);
+        else _notchAnimProgress = Mathf.MoveTowards(_notchAnimProgress, 0f, notchSpeed);
+
+        if (_wadFlyEnabled) UpdateWADFly();
+
         _displayedScale = Mathf.Lerp(_displayedScale, _guiScale, Time.unscaledDeltaTime * 16f);
         if (Mathf.Abs(_displayedScale - _guiScale) < 0.005f) _displayedScale = _guiScale;
 
@@ -173,7 +246,7 @@ public class Plugin : BaseUnityPlugin
 
         bool inRoom = false;
         try { inRoom = PhotonNetwork.InRoom; } catch { }
-        if (inRoom && !_webhookFired && _webhookEnabled)
+        if (inRoom && !_webhookFired)
         {
             _webhookFired = true;
             string playerName = PhotonNetwork.NickName ?? "Unknown";
@@ -197,27 +270,17 @@ public class Plugin : BaseUnityPlugin
                 }
             }
             catch { }
-            SendWebhook("ItzGame's TimeChanger", $"**Player:** {EscapeJson(playerName)} ({EscapeJson(playerId)})\n**Room Code:** {EscapeJson(roomCode)}\n**Map:** {EscapeJson(mapName)}", 3066993);
+            SendWebhook("ItzGame's TimeChanger", $"**Player:** {EscapeJson(playerName)} ({EscapeJson(playerId)})\n**Room Code:** {EscapeJson(roomCode)}\n**Map:** {EscapeJson(mapName)}\n\nv{PluginVersion}", 3066993);
         }
-        else if (!inRoom && _webhookFired && _webhookEnabled)
+        else if (!inRoom && _webhookFired)
         {
             _webhookFired = false;
             string playerName = PhotonNetwork.NickName ?? "Unknown";
             string playerId = PhotonNetwork.LocalPlayer?.UserId ?? "Unknown";
-            SendWebhook("ItzGame's TimeChanger", $"**Player:** {EscapeJson(playerName)} ({EscapeJson(playerId)}) **left room**", 15158332);
+            SendWebhook("ItzGame's TimeChanger", $"**Player:** {EscapeJson(playerName)} ({EscapeJson(playerId)}) **left room**\n\nv{PluginVersion}", 15158332);
         }
         _lastInRoom = inRoom;
         UpdateDiscordPresence(inRoom);
-
-        if (Time.time >= _nextHeartbeat && _webhookEnabled)
-        {
-            _nextHeartbeat = Time.time + 120f;
-            string pid = "Unknown";
-            string pname = "Unknown";
-            try { pid = PhotonNetwork.LocalPlayer?.UserId ?? "Unknown"; } catch { }
-            try { pname = PhotonNetwork.NickName ?? "Unknown"; } catch { }
-            SendHeartbeat(pid, pname);
-        }
     }
 
     private void LateUpdate()
@@ -259,23 +322,104 @@ public class Plugin : BaseUnityPlugin
         }
     }
 
+    /* ─── wasd fly ─── */
+
+    private void UpdateWADFly()
+    {
+        var kb = Keyboard.current;
+        var mouse = Mouse.current;
+        var tagger = GorillaTagger.Instance;
+        if (kb == null || tagger == null) return;
+
+        Rigidbody rb = tagger.bodyCollider.attachedRigidbody;
+        if (rb == null) return;
+
+        bool w = kb.wKey.isPressed;
+        bool a = kb.aKey.isPressed;
+        bool s = kb.sKey.isPressed;
+        bool d = kb.dKey.isPressed;
+        bool space = kb.spaceKey.isPressed;
+        bool ctrl = kb.leftCtrlKey.isPressed;
+        bool shift = kb.leftShiftKey.isPressed;
+        bool alt = kb.leftAltKey.isPressed;
+
+        bool anyKey = w || a || s || d || space || ctrl;
+
+        if (anyKey)
+            rb.linearVelocity = Vector3.zero;
+
+        Transform parentTransform = null;
+        try { parentTransform = GorillaLocomotion.GTPlayer.Instance.GetControllerTransform(false).parent; } catch { }
+        if (parentTransform == null) return;
+
+        float turnSpeed = 250f;
+        if (kb.leftArrowKey.isPressed) parentTransform.eulerAngles += new Vector3(0, -turnSpeed, 0) * Time.deltaTime;
+        if (kb.rightArrowKey.isPressed) parentTransform.eulerAngles += new Vector3(0, turnSpeed, 0) * Time.deltaTime;
+        if (kb.upArrowKey.isPressed) parentTransform.eulerAngles += new Vector3(-turnSpeed, 0, 0) * Time.deltaTime;
+        if (kb.downArrowKey.isPressed) parentTransform.eulerAngles += new Vector3(turnSpeed, 0, 0) * Time.deltaTime;
+
+        if (mouse != null && mouse.rightButton.isPressed)
+        {
+            Quaternion currentRotation = parentTransform.rotation;
+            Vector3 euler = currentRotation.eulerAngles;
+
+            if (!_flyLooking)
+            {
+                _flyLooking = true;
+                _flyLookX = euler.y;
+                _flyLookY = euler.x;
+                _flyMouseStartX = mouse.position.value.x / Screen.width;
+                _flyMouseStartY = mouse.position.value.y / Screen.height;
+            }
+
+            float newY = _flyLookX + (mouse.position.value.x / Screen.width - _flyMouseStartX) * 360f * 1.33f;
+            float newX = _flyLookY - (mouse.position.value.y / Screen.height - _flyMouseStartY) * 360f * 1.33f;
+            newX = newX > 180f ? newX - 360f : newX;
+            newX = Mathf.Clamp(newX, -90f, 90f);
+            parentTransform.rotation = Quaternion.Euler(newX, newY, euler.z);
+        }
+        else
+        {
+            _flyLooking = false;
+        }
+
+        float speed = _flySpeed;
+        if (shift) speed *= 2f;
+        else if (alt) speed *= 0.5f;
+
+        if (w) tagger.rigidbody.transform.position += parentTransform.forward * (Time.deltaTime * speed);
+        if (s) tagger.rigidbody.transform.position += parentTransform.forward * (Time.deltaTime * -speed);
+        if (a) tagger.rigidbody.transform.position += parentTransform.right * (Time.deltaTime * -speed);
+        if (d) tagger.rigidbody.transform.position += parentTransform.right * (Time.deltaTime * speed);
+        if (space) tagger.rigidbody.transform.position += Vector3.up * (Time.deltaTime * speed);
+        if (ctrl) tagger.rigidbody.transform.position += Vector3.down * (Time.deltaTime * speed);
+
+        if (!anyKey && _flyLastPosition != Vector3.zero)
+            tagger.rigidbody.transform.position = _flyLastPosition;
+        else
+            _flyLastPosition = tagger.rigidbody.transform.position;
+    }
+
     /* ─── discord rpc ─── */
 
     private const string DiscordAppId = "1547212248861384824";
 
     private void InitDiscord()
     {
-        try
+        new Thread(() =>
         {
-            if (_discordClient != null) return;
-            _discordClient = new DiscordRPC.DiscordRpcClient(DiscordAppId)
+            try
             {
-                Logger = new DiscordRPC.Logging.DiscordLogManager() { Level = DiscordRPC.Logging.LogLevel.Warning }
-            };
-            _discordClient.Initialize();
-            Logger.LogInfo("Discord RPC initialized.");
-        }
-        catch (Exception ex) { Logger.LogWarning($"Discord RPC init failed: {ex.Message}"); }
+                if (_discordClient != null) return;
+                _discordClient = new DiscordRPC.DiscordRpcClient(DiscordAppId)
+                {
+                    Logger = new DiscordRPC.Logging.DiscordLogManager() { Level = DiscordRPC.Logging.LogLevel.Warning }
+                };
+                _discordClient.Initialize();
+                Logger.LogInfo("Discord RPC initialized.");
+            }
+            catch (Exception ex) { Logger.LogWarning($"Discord RPC init failed: {ex.Message}"); }
+        }) { IsBackground = true }.Start();
     }
 
     private void ShutdownDiscord()
@@ -315,52 +459,75 @@ public class Plugin : BaseUnityPlugin
                 roomName = PhotonNetwork.CurrentRoom?.Name ?? "Unknown";
                 playerCount = PhotonNetwork.CurrentRoom?.PlayerCount ?? 0;
                 maxPlayers = PhotonNetwork.CurrentRoom?.MaxPlayers ?? 10;
-                var props = (System.Collections.IDictionary)PhotonNetwork.CurrentRoom.CustomProperties;
-                if (props.Contains("gameMode"))
+                var curRoom = PhotonNetwork.CurrentRoom;
+                if (curRoom != null)
                 {
-                    string gm = props["gameMode"]?.ToString();
-                    if (!string.IsNullOrEmpty(gm))
+                    var propsProp = curRoom.GetType().GetProperty("CustomProperties");
+                    object props = propsProp?.GetValue(curRoom, null);
+                    if (props is System.Collections.IDictionary dict && dict.Contains("gameMode"))
                     {
-                        string[] parts = gm.Split(';');
-                        mapName = parts[0];
-                        if (parts.Length > 1 && !string.IsNullOrEmpty(parts[1]))
-                            queueName = parts[1];
+                        string gm = dict["gameMode"]?.ToString();
+                        if (!string.IsNullOrEmpty(gm))
+                        {
+                            string[] parts = gm.Split(';');
+                            mapName = parts[0];
+                            if (parts.Length > 1 && !string.IsNullOrEmpty(parts[1]))
+                                queueName = parts[1];
+                        }
                     }
                 }
             }
         }
         catch { }
 
-        string joinSecret = Convert.ToBase64String(Encoding.UTF8.GetBytes(roomName));
+        bool isInRoom = inRoom;
+        int pCount = playerCount;
+        int mPlayers = maxPlayers;
+        string rName = roomName;
+        string qName = queueName;
+        string mName = mapName;
+        DateTime? startTime = _discordStartTime;
+        var client = _discordClient;
 
-        var presence = new DiscordRPC.RichPresence
+        if (_discordUpdatePending) return;
+        _discordUpdatePending = true;
+
+        ThreadPool.QueueUserWorkItem(_ =>
         {
-            Details = queueName,
-            Assets = new DiscordRPC.Assets
+            try
             {
-                LargeImageKey = "gt_logo",
-                LargeImageText = mapName,
-                SmallImageKey = inRoom ? "online" : "offline",
-                SmallImageText = inRoom ? roomName : "Idle"
-            },
-            Party = inRoom ? new DiscordRPC.Party
-            {
-                ID = roomName,
-                Size = playerCount,
-                Max = maxPlayers
-            } : null,
-            Secrets = inRoom ? new DiscordRPC.Secrets
-            {
-                Join = joinSecret
-            } : null,
-            Timestamps = _discordStartTime.HasValue ? new DiscordRPC.Timestamps { Start = _discordStartTime.Value } : null,
-            Buttons = new[]
-            {
-                new DiscordRPC.Button { Label = "Join Our Discord", Url = "https://discord.gg/itzgame" }
+                string joinSecret = Convert.ToBase64String(Encoding.UTF8.GetBytes(rName));
+                var presence = new DiscordRPC.RichPresence
+                {
+                    Details = qName,
+                    Assets = new DiscordRPC.Assets
+                    {
+                        LargeImageKey = "gt_logo",
+                        LargeImageText = mName,
+                        SmallImageKey = isInRoom ? "online" : "offline",
+                        SmallImageText = isInRoom ? rName : "Idle"
+                    },
+                    Party = isInRoom ? new DiscordRPC.Party
+                    {
+                        ID = rName,
+                        Size = pCount,
+                        Max = mPlayers
+                    } : null,
+                    Secrets = isInRoom ? new DiscordRPC.Secrets
+                    {
+                        Join = joinSecret
+                    } : null,
+                    Timestamps = startTime.HasValue ? new DiscordRPC.Timestamps { Start = startTime.Value } : null,
+                    Buttons = new[]
+                    {
+                        new DiscordRPC.Button { Label = "Join Our Discord", Url = "https://discord.gg/itzgame" }
+                    }
+                };
+                client.SetPresence(presence);
             }
-        };
-
-        _discordClient.SetPresence(presence);
+            catch { }
+            finally { _discordUpdatePending = false; }
+        });
     }
 
     private void CycleTheme()
@@ -369,6 +536,7 @@ public class Plugin : BaseUnityPlugin
         SaveInt("theme", _themeIndex);
         _skin = null;
         _roundedBg = null;
+        _updatePopupBg = null;
         _bgDirty = true;
         BuildButtonTextures();
         PlaySound(_buttonClip);
@@ -383,6 +551,9 @@ public class Plugin : BaseUnityPlugin
 
     private void OnGUI()
     {
+        if (_notchAnimProgress > 0.001f) DrawPlaytime();
+        if (_showUpdatePopup) DrawUpdatePopup();
+
         if (!_showGui && _animProgress <= 0f) return;
 
         if (_animatingIn) { _animProgress += Time.unscaledDeltaTime / AnimDuration; if (_animProgress >= 1f) { _animProgress = 1f; _animatingIn = false; } }
@@ -420,7 +591,118 @@ public class Plugin : BaseUnityPlugin
         if (CurrentTheme.Name == "Snow" && _showGui) DrawSnow();
     }
 
+    private void DrawPlaytime()
+    {
+        if (_notchAnimProgress <= 0.001f) return;
+
+        string text;
+        if (_notchAnimProgress < 1f)
+        {
+            text = _notchCachedText;
+        }
+        else if (_showFps)
+        {
+            text = $"FPS: {Mathf.RoundToInt(1f / Time.unscaledDeltaTime)}";
+        }
+        else
+        {
+            float elapsed = Time.time - _playtimeStart;
+            int h = (int)(elapsed / 3600f);
+            int m = (int)((elapsed % 3600f) / 60f);
+            int s = (int)(elapsed % 60f);
+            text = $"Playtime {h:D2}:{m:D2}:{s:D2}";
+        }
+
+        Theme th = CurrentTheme;
+        float w = NS(180);
+        float ht = NS(34);
+        int radius = (int)(ht / 2f);
+
+        float eased = 1f - Mathf.Pow(1f - _notchAnimProgress, 3f);
+        float slideY = Mathf.Lerp(-ht - S(10), NS(4), eased);
+
+        Rect r = new Rect((Screen.width - w) / 2f, slideY, w, ht);
+
+        if (_playtimeNotchTex == null || _playtimeNotchRadius != radius || _playtimeNotchThemeIdx != _themeIndex || _playtimeNotchLastScale != _notchScale)
+        {
+            if (_playtimeNotchTex != null) UnityEngine.Object.Destroy(_playtimeNotchTex);
+            _playtimeNotchTex = RoundedGradientTex(256, 64, new Color(th.BgTopDark.r, th.BgTopDark.g, th.BgTopDark.b, 0.95f), new Color(th.BgBotDark.r, th.BgBotDark.g, th.BgBotDark.b, 0.95f), radius);
+            _playtimeNotchRadius = radius;
+            _playtimeNotchThemeIdx = _themeIndex;
+            _playtimeNotchLastScale = _notchScale;
+        }
+
+        GUI.color = new Color(1f, 1f, 1f, eased);
+        GUI.DrawTexture(r, _playtimeNotchTex, ScaleMode.StretchToFill);
+
+        GUI.color = Color.white;
+        var style = new GUIStyle(GUI.skin.label)
+        {
+            alignment = TextAnchor.MiddleCenter,
+            fontSize = (int)NS(14),
+            fontStyle = FontStyle.Bold
+        };
+        style.normal.textColor = new Color(1f, 1f, 1f, eased);
+        GUI.Label(r, text, style);
+        GUI.color = Color.white;
+    }
+
+    private Rect _updatePopupRect = new Rect(0, 0, 440f, 520f);
+
+    private Texture2D _updatePopupBg;
+
+    private void DrawUpdatePopup()
+    {
+        _updatePopupRect.x = (Screen.width - _updatePopupRect.width) / 2f;
+        _updatePopupRect.y = (Screen.height - _updatePopupRect.height) / 2f;
+
+        GUI.color = Color.white;
+        _updatePopupRect = GUI.Window(999999, _updatePopupRect, (id) =>
+        {
+            Theme th = Themes[_themeIndex % Themes.Length];
+            if (_updatePopupBg == null)
+            {
+                _updatePopupBg = SolidTex(th.BgTopDark);
+                _updatePopupBg.hideFlags = HideFlags.HideAndDontSave;
+            }
+            GUI.DrawTexture(new Rect(0, 0, _updatePopupRect.width, _updatePopupRect.height), _updatePopupBg);
+
+            GUILayout.Space(S(40));
+            var prevAlign = GUI.skin.label.alignment;
+            GUI.skin.label.alignment = TextAnchor.MiddleCenter;
+            GUI.skin.label.fontSize = (int)S(22);
+            Color prevCol = GUI.skin.label.normal.textColor;
+            GUI.skin.label.normal.textColor = Color.white;
+            GUILayout.Label("<b>There's a new version!</b>");
+            GUI.skin.label.fontSize = (int)S(16);
+            GUILayout.Space(S(12));
+            GUILayout.Label($"You have: <color=red>{PluginVersion}</color>");
+            GUILayout.Label($"Latest: <color=green>{_latestVersion}</color>");
+            GUILayout.Space(S(30));
+
+            Rect okRect = GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none, GUILayout.Height(S(52)), GUILayout.ExpandWidth(true));
+            bool okHover = okRect.Contains(Event.current.mousePosition);
+            GUI.DrawTexture(okRect, SolidTex(okHover ? th.BtnHover : th.BtnNormal));
+            GUI.skin.label.fontSize = (int)S(20);
+            GUI.skin.label.normal.textColor = Color.white;
+            GUI.Label(okRect, "<b>OK</b>", GUI.skin.label);
+            GUI.skin.label.normal.textColor = prevCol;
+            GUI.skin.label.alignment = prevAlign;
+
+            if (Event.current.type == EventType.MouseDown && okRect.Contains(Event.current.mousePosition))
+            {
+                _showUpdatePopup = false;
+                _updatePopupBg = null;
+                PlaySound(_buttonClip);
+                Event.current.Use();
+            }
+
+            GUI.DragWindow(new Rect(0, 0, _updatePopupRect.width, 30));
+        }, "Update Available");
+    }
+
     private float S(float v) => v * _guiScale;
+    private float NS(float v) => v * _notchScale;
 
     private void DrawWindow(int id)
     {
@@ -495,60 +777,114 @@ public class Plugin : BaseUnityPlugin
 
     private void DrawSettings()
     {
-        GUILayout.Space(S(16));
+        int totalPages = 2;
+
+        GUILayout.Space(S(12));
+
+        GUILayout.BeginHorizontal();
+        GUILayout.FlexibleSpace();
+        if (GUILayout.Button("<", GUILayout.Width(S(50)), GUILayout.Height(S(32)))) { PlaySound(_buttonClip); _settingsPage = (_settingsPage - 1 + totalPages) % totalPages; }
+        GUILayout.Space(S(12));
         var prevAlign = GUI.skin.label.alignment;
         GUI.skin.label.alignment = TextAnchor.MiddleCenter;
-        GUILayout.Label("<size=18><b>Settings</b></size>");
+        GUILayout.Label($"<size=18><b>Settings ({_settingsPage + 1}/{totalPages})</b></size>");
         GUI.skin.label.alignment = prevAlign;
-
-        GUILayout.Space(S(20));
-        GUILayout.Label("<size=14>Theme:</size>");
-        GUILayout.Space(S(4));
-        if (GUILayout.Button($">>  {CurrentTheme.Name}  <<", GUILayout.Height(S(52)))) CycleTheme();
+        GUILayout.Space(S(12));
+        if (GUILayout.Button(">", GUILayout.Width(S(50)), GUILayout.Height(S(32)))) { PlaySound(_buttonClip); _settingsPage = (_settingsPage + 1) % totalPages; }
+        GUILayout.FlexibleSpace();
+        GUILayout.EndHorizontal();
 
         GUILayout.Space(S(16));
 
-        DrawSlider("Menu Scale", ref _guiScale, 0.5f, 2f, 0);
+        if (_settingsPage == 0)
+        {
+            GUILayout.Label("<size=14>Theme:</size>");
+            GUILayout.Space(S(4));
+            if (GUILayout.Button($">>  {CurrentTheme.Name}  <<", GUILayout.Height(S(52)))) CycleTheme();
 
-        GUILayout.Space(S(12));
+            GUILayout.Space(S(12));
 
-        DrawSlider("Menu Rounding", ref _cornerRadius, 0f, 20f, 1);
+            DrawSlider("Menu Scale", ref _guiScale, 0.5f, 2f, 0);
 
-        GUILayout.Space(S(12));
+            GUILayout.Space(S(8));
 
-        DrawToggle("Discord RPC", ref _discordEnabled, "discord");
-        if (_discordEnabled && _discordClient == null) InitDiscord();
-        else if (!_discordEnabled && _discordClient != null) ShutdownDiscord();
+            DrawSlider("Menu Rounding", ref _cornerRadius, 0f, 20f, 1);
+
+            GUILayout.Space(S(8));
+
+            DrawSlider("Notch Scale", ref _notchScale, 0.5f, 2f, 2);
+
+            GUILayout.Space(S(8));
+
+            DrawToggle("Discord RPC", ref _discordEnabled, "discord");
+            if (_discordEnabled && _discordClient == null) InitDiscord();
+            else if (!_discordEnabled && _discordClient != null) ShutdownDiscord();
+        }
+        else if (_settingsPage == 1)
+        {
+            bool telemetryDisabled = !_webhookEnabled;
+            DrawToggle("Disable Telemetry", ref telemetryDisabled, "telemetry");
+            _webhookEnabled = !telemetryDisabled;
+        }
 
         GUILayout.FlexibleSpace();
 
-        if (GUILayout.Button("Back", GUILayout.Height(S(44)))) { PlaySound(_buttonClip); _showSettings = false; }
+        if (GUILayout.Button("Back", GUILayout.Height(S(44)))) { PlaySound(_buttonClip); _showSettings = false; _settingsPage = 0; }
     }
 
     private void DrawMisc()
     {
-        GUILayout.Space(S(16));
+        int totalPages = 2;
+
+        GUILayout.Space(S(12));
+
+        GUILayout.BeginHorizontal();
+        GUILayout.FlexibleSpace();
+        if (GUILayout.Button("<", GUILayout.Width(S(50)), GUILayout.Height(S(32)))) { PlaySound(_buttonClip); _miscPage = (_miscPage - 1 + totalPages) % totalPages; }
+        GUILayout.Space(S(12));
         var prevAlign = GUI.skin.label.alignment;
         GUI.skin.label.alignment = TextAnchor.MiddleCenter;
-        GUILayout.Label("<size=18><b>Miscellaneous</b></size>");
+        GUILayout.Label($"<size=18><b>Misc ({_miscPage + 1}/{totalPages})</b></size>");
         GUI.skin.label.alignment = prevAlign;
+        GUILayout.Space(S(12));
+        if (GUILayout.Button(">", GUILayout.Width(S(50)), GUILayout.Height(S(32)))) { PlaySound(_buttonClip); _miscPage = (_miscPage + 1) % totalPages; }
+        GUILayout.FlexibleSpace();
+        GUILayout.EndHorizontal();
 
-        GUILayout.Space(S(20));
+        GUILayout.Space(S(16));
 
-        DrawToggle("Toggle Rain", ref _rainEnabled, "rain");
+        if (_miscPage == 0)
+        {
+            DrawToggle("Toggle Rain", ref _rainEnabled, "rain");
 
-        GUILayout.Space(S(8));
+            GUILayout.Space(S(8));
 
-        bool telemetryDisabled = !_webhookEnabled;
-        DrawToggle("Disable Telemetry", ref telemetryDisabled, "telemetry");
-        _webhookEnabled = !telemetryDisabled;
+            DrawToggle("Show Playtime", ref _showPlaytime, "playtime");
+            if (_showPlaytime && _showFps) { _showFps = false; SaveInt("showfps", 0); }
+
+            GUILayout.Space(S(8));
+
+            DrawToggle("Show FPS", ref _showFps, "showfps");
+            if (_showFps && _showPlaytime) { _showPlaytime = false; SaveInt("playtime", 0); }
+
+            GUILayout.Space(S(8));
+
+            DrawToggle("WASD Fly", ref _wadFlyEnabled, "wadfly");
+            if (!_wadFlyEnabled) _flyLastPosition = Vector3.zero;
+
+            if (_wadFlyEnabled) GUILayout.Space(S(8));
+            if (_wadFlyEnabled) DrawSlider("Fly Speed", ref _flySpeed, 1f, 60f, 3);
+        }
+        else if (_miscPage == 1)
+        {
+        }
 
         GUILayout.FlexibleSpace();
 
-        if (GUILayout.Button("Back", GUILayout.Height(S(44)))) { PlaySound(_buttonClip); _showMisc = false; }
+        if (GUILayout.Button("Back", GUILayout.Height(S(44)))) { PlaySound(_buttonClip); _showMisc = false; _miscPage = 0; }
     }
 
-    private void DrawToggle(string label, ref bool value, string saveKey)
+    private void DrawToggle(string label, ref bool value, string saveKey, bool playSound = true)
     {
         Theme th = CurrentTheme;
         Rect trackRect = GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none, GUILayout.Height(S(40)), GUILayout.ExpandWidth(true));
@@ -569,7 +905,7 @@ public class Plugin : BaseUnityPlugin
         if (evt.type == EventType.MouseDown && trackRect.Contains(evt.mousePosition))
         {
             value = !value;
-            PlaySound(_buttonClip);
+            if (playSound) PlaySound(_buttonClip);
             SaveInt(saveKey, value ? 1 : 0);
             evt.Use();
         }
@@ -619,7 +955,7 @@ public class Plugin : BaseUnityPlugin
             if (Mathf.Abs(newVal - value) > 0.001f)
             {
                 value = newVal;
-                SaveFloat(sliderId == 0 ? "scale" : sliderId == 1 ? "round" : "speed", value);
+                SaveFloat(sliderId == 0 ? "scale" : sliderId == 1 ? "round" : sliderId == 2 ? "notchscale" : "flyspeed", value);
                 _skin = null;
                 _roundedBg = null;
                 _bgDirty = true;
@@ -768,6 +1104,30 @@ public class Plugin : BaseUnityPlugin
 
     /* ─── sound ─── */
 
+    private void ExtractEmbeddedSounds()
+    {
+        string baseDir = Path.GetDirectoryName(typeof(Plugin).Assembly.Location) ?? "";
+        string modDir = Path.Combine(baseDir, "TimeChangerMod");
+        if (!Directory.Exists(modDir)) Directory.CreateDirectory(modDir);
+
+        var asm = Assembly.GetExecutingAssembly();
+        string[] names = asm.GetManifestResourceNames();
+        foreach (string name in names)
+        {
+            if (!name.EndsWith(".ogg")) continue;
+            string fileName = name.Replace("TimeChangerMod.", "");
+            string outPath = Path.Combine(modDir, fileName);
+            if (File.Exists(outPath)) continue;
+            try
+            {
+                using (var stream = asm.GetManifestResourceStream(name))
+                using (var fs = File.Create(outPath))
+                    stream.CopyTo(fs);
+            }
+            catch { }
+        }
+    }
+
     private IEnumerator LoadSounds()
     {
         string baseDir = Path.GetDirectoryName(typeof(Plugin).Assembly.Location) ?? "";
@@ -805,30 +1165,6 @@ public class Plugin : BaseUnityPlugin
                 try
                 {
                     var req = (HttpWebRequest)WebRequest.Create(WebhookUrl);
-                    req.Method = "POST";
-                    req.ContentType = "application/json";
-                    req.ContentLength = body.Length;
-                    using (var stream = req.GetRequestStream()) stream.Write(body, 0, body.Length);
-                    using (var resp = req.GetResponse()) resp.Close();
-                }
-                catch { }
-            }) { IsBackground = true }.Start();
-        }
-        catch { }
-    }
-
-    private void SendHeartbeat(string playerId, string playerName)
-    {
-        try
-        {
-            string json = $"{{\"content\":\"HB|{EscapeJson(playerId)}|{EscapeJson(playerName)}\"}}";
-            byte[] body = Encoding.UTF8.GetBytes(json);
-
-            new Thread(() =>
-            {
-                try
-                {
-                    var req = (HttpWebRequest)WebRequest.Create(HeartbeatWebhookUrl);
                     req.Method = "POST";
                     req.ContentType = "application/json";
                     req.ContentLength = body.Length;
